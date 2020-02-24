@@ -83,10 +83,6 @@ func (mb MouseButtons) Name() string {
 	}
 }
 
-type Position struct {
-	X, Y int
-}
-
 type MouseData struct {
 	Position
 	Buttons         MouseButtons
@@ -95,10 +91,6 @@ type MouseData struct {
 }
 
 type KeyData tcell.Key
-
-type Size struct {
-	W, H int
-}
 
 type Event struct {
 	EventType
@@ -203,8 +195,7 @@ func (h *EventHandler) HandleEvent(evt Event) (Action, error) {
 	var action Action
 	if sDef.action != nil {
 		action = sDef.action(h.events)
-		h.currentState = ""
-		h.events = nil
+		h.Reset()
 		log.Printf("Action found, back to initial state")
 	}
 	return action, nil
@@ -252,4 +243,10 @@ func (h *EventHandler) RegisterAction(seq string, action ActionMaker) error {
 	sDef.action = action
 	h.states[s] = sDef
 	return nil
+}
+
+// Reset the handler so any ongoing sequence is aborted.
+func (h *EventHandler) Reset() {
+	h.currentState = ""
+	h.events = nil
 }

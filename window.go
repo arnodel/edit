@@ -8,8 +8,8 @@ import (
 // rectangle view into the buffer.
 type Window struct {
 	buffer           *Buffer
-	l, c             int
-	topLine, leftCol int
+	l, c             int // line and column of the cursor
+	topLine, leftCol int // Index of the topmost visible line, column of the leftmost visibile column
 	tabSize          int
 	width, height    int
 }
@@ -130,8 +130,8 @@ func (w *Window) Resize(width, height int) {
 }
 
 // Draw draws the contents of the window on the screen.
-func (w *Window) Draw(screen *Screen) {
-	_, sh := screen.Size()
+func (w *Window) Draw(screen ScreenWriter) {
+	sh := screen.Size().H
 	linesAvail := w.buffer.LineCount() - w.topLine
 	if linesAvail <= 0 {
 		return
@@ -139,44 +139,38 @@ func (w *Window) Draw(screen *Screen) {
 	if sh > linesAvail {
 		sh = linesAvail
 	}
-	for p := w.getPrinter(); p.Y < sh; p.Y++ {
+	lp := w.getPrinter()
+	for p := (Position{}); p.Y < sh; p.Y++ {
 		line, _ := w.buffer.GetLine(p.Y+w.topLine, 0)
-		p.Print(screen, line)
+		lp.Print(screen, p, line)
 	}
 }
 
 // DrawCursor highlights the cursor if it is visible.
-func (w *Window) DrawCursor(screen *Screen) {
-	sw, sh := screen.Size()
+func (w *Window) DrawCursor(screen ScreenWriter) {
 	line, _ := w.buffer.GetLine(w.l, w.c)
-	x := w.getPrinter().LineCol(line[:w.c])
-
-	if x < 0 || x >= sw {
-		return
-	}
-	y := w.l - w.topLine
-	if y < 0 || y >= sh {
-		return
-	}
-	screen.Reverse(x, y)
+	screen.Reverse(Position{
+		X: w.getPrinter().LineCol(line[:w.c]),
+		Y: w.l - w.topLine,
+	})
 }
 
 // FocusCursor adjusts the visible rectangle of the window if necessary to make
 // the cursor visible.
-func (w *Window) FocusCursor(screen *Screen) {
-	sw, sh := screen.Size()
+func (w *Window) FocusCursor(screen ScreenWriter) {
+	sz := screen.Size()
 	line, _ := w.buffer.GetLine(w.l, w.c)
 	x := w.getPrinter().LineCol(line[:w.c])
 	if x < 0 {
 		w.leftCol += x
-	} else if x >= sw {
-		w.leftCol += x - sw + 1
+	} else if x >= sz.W {
+		w.leftCol += x - sz.W + 1
 	}
 	y := w.l - w.topLine
 	if y < 0 {
 		w.topLine = w.l
-	} else if y >= sh {
-		w.topLine = w.l - sh + 1
+	} else if y >= sz.H {
+		w.topLine = w.l - sz.H + 1
 	}
 }
 

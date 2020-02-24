@@ -83,6 +83,11 @@ func main() {
 	}
 
 	evtHandler := NewEventHandler()
+
+	app := App{
+		window:       win,
+		eventHandler: evtHandler,
+	}
 	evtConverter := TcellEventConverter{}
 
 	for _, b := range defaultBindings {
@@ -91,21 +96,13 @@ func main() {
 
 	for {
 		screen.Fill(' ')
-		win.FocusCursor(screen)
-		win.Draw(screen)
-		win.DrawCursor(screen)
+		app.Draw(screen)
 		tcellScreen.Show()
 		tcevt := tcellScreen.PollEvent()
 		keyEvt, ok := tcevt.(*tcell.EventKey)
 		if ok && keyEvt.Key() == tcell.KeyCtrlC {
 			return
 		}
-		evt := evtConverter.EventFromTcell(tcevt)
-		act, err := evtHandler.HandleEvent(evt)
-		if err != nil {
-			log.Print(err)
-		} else if act != nil {
-			act(win)
-		}
+		app.HandleEvent(evtConverter.EventFromTcell(tcevt))
 	}
 }
