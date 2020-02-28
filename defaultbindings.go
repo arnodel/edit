@@ -9,9 +9,8 @@ func CmdCursorRight(w *Window) { w.MoveCursor(0, 1) }
 func CmdCursorUp(w *Window)    { w.MoveCursor(-1, 0) }
 func CmdCursorDown(w *Window)  { w.MoveCursor(1, 0) }
 
-func CmdDeletePrevRune(w *Window) { w.DeleteRune() }
-func CmdCarriageReturn(w *Window) { w.SplitLine(true) }
-
+func CmdDeletePrevRune(w *Window)  { w.DeleteRune() }
+func CmdCarriageReturn(w *Window)  { w.SplitLine(true) }
 func CmdMoveToLineStart(w *Window) { w.MoveCursorToLineStart() }
 func CmdMoveToLineEnd(w *Window)   { w.MoveCursorToLineEnd() }
 
@@ -32,7 +31,7 @@ func CmdMoveCursorTo(pos Position) Action {
 func CmdSaveBuffer(w *Window) { w.buffer.Save() }
 
 func SimpleActionMaker(f Action) ActionMaker {
-	return func(evts []Event) Action { return f }
+	return func(args []interface{}) Action { return f }
 }
 
 var defaultBindings = []struct {
@@ -40,9 +39,9 @@ var defaultBindings = []struct {
 	action ActionMaker
 }{
 	{
-		seq: "Rune",
-		action: func(evts []Event) Action {
-			return CmdInsertRune(evts[0].Rune)
+		seq: "Rune.Rune",
+		action: func(args []interface{}) Action {
+			return CmdInsertRune(args[0].(rune))
 		},
 	},
 	{
@@ -51,10 +50,6 @@ var defaultBindings = []struct {
 	},
 	{
 		seq:    "Left",
-		action: SimpleActionMaker(CmdCursorLeft),
-	},
-	{
-		seq:    "Ctrl-B",
 		action: SimpleActionMaker(CmdCursorLeft),
 	},
 	{
@@ -106,16 +101,16 @@ var defaultBindings = []struct {
 		action: SimpleActionMaker(CmdPageUp),
 	},
 	{
-		seq: "Resize",
-		action: func(evts []Event) Action {
-			size := evts[0].Size
+		seq: "Resize.Size",
+		action: func(args []interface{}) Action {
+			size := args[0].(Size)
 			return CmdResize(size.W, size.H)
 		},
 	},
 	{
-		seq: "MousePress-Button1",
-		action: func(evts []Event) Action {
-			return CmdMoveCursorTo(evts[0].Position)
+		seq: "MousePress-Button1.Position",
+		action: func(args []interface{}) Action {
+			return CmdMoveCursorTo(args[0].(Position))
 		},
 	},
 	{

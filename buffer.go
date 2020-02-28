@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -25,6 +24,7 @@ type IBuffer interface {
 type Buffer struct {
 	lines    []Line
 	filename string
+	readOnly bool
 }
 
 func NewBufferFromFile(filename string) *Buffer {
@@ -55,9 +55,11 @@ func NewBufferFromFile(filename string) *Buffer {
 }
 
 func (b *Buffer) Save() error {
+	if b.readOnly {
+		return errors.New("Cannot save a read only buffer")
+	}
 	err := os.Rename(b.filename, b.filename+"~")
 	if err != nil && !os.IsNotExist(err) {
-		log.Printf("Unable to back up file: %s", err)
 		return err
 	}
 	file, err := os.Create(b.filename)
@@ -120,6 +122,10 @@ func (b *Buffer) InsertLine(l int, line Line) {
 		copy(newLines[l+1:], b.lines[l:])
 		b.lines = newLines
 	}
+}
+
+func (b *Buffer) AppendLine(line Line) {
+	b.InsertLine(len(b.lines), line)
 }
 
 func (b *Buffer) DeleteLine(l int) {

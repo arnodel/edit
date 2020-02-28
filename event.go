@@ -149,10 +149,11 @@ func addPrefix(s, p string) string {
 
 type Action func(win *Window)
 
-type ActionMaker func([]Event) Action
+type ActionMaker func([]interface{}) Action
 
 type stateDef struct {
 	action      ActionMaker
+	eventFields []string
 	transitions map[string]string
 }
 
@@ -168,9 +169,28 @@ func NewEventHandler() *EventHandler {
 	}
 }
 
+func convertEvents(events []Event, fields []string) []interface{} {
+	var out []interface{}
+	for i, evt := range events {
+		switch fields[i] {
+		case "Rune":
+			out = append(out, evt.Rune)
+		case "Position":
+			out = append(out, evt.Position)
+		case "Size":
+			out = append(out, evt.Size)
+
+		}
+	}
+	return out
+}
+
 // HandleEvent transitions the state of the event handler and returns any action
 // that may be triggered.
 func (h *EventHandler) HandleEvent(evt Event) (Action, error) {
+	if h == nil {
+		return nil, nil
+	}
 	sDef := h.states[h.currentState]
 	evtName := evt.Name()
 	trans := evtName
@@ -184,19 +204,16 @@ func (h *EventHandler) HandleEvent(evt Event) (Action, error) {
 			// Discard a mouse event that has no button presses or releases
 			return nil, nil
 		}
-		h.currentState = ""
-		log.Printf("No transition for event %s", evt.Name())
+		h.Reset()
 		return nil, errors.New("no known transition for event")
 	}
-	log.Printf("Transition: %s, new state: %s", trans, newState)
 	sDef = h.states[newState]
 	h.currentState = newState
 	h.events = append(h.events, evt)
 	var action Action
 	if sDef.action != nil {
-		action = sDef.action(h.events)
+		action = sDef.action(convertEvents(h.events, sDef.eventFields))
 		h.Reset()
-		log.Printf("Action found, back to initial state")
 	}
 	return action, nil
 }
@@ -212,17 +229,27 @@ func (h *EventHandler) HandleEvent(evt Event) (Action, error) {
 // It will also record that the state x:y:z triggers action x:y:z triggers
 // action
 func (h *EventHandler) RegisterAction(seq string, action ActionMaker) error {
+	if h == nil {
+		return errors.New("cannot register an action on a nil handler")
+	}
 	events := strings.Split(seq, " ")
 	s := ""
+	var eventFields []string
+	var eventNames []string
 	for _, event := range events {
-		sDef, ok := h.states[s]
-		if !ok {
-			break
+		parts := strings.SplitN(event, ".", 2)
+		eventName := parts[0]
+		eventField := ""
+		if len(parts) == 2 {
+			eventField = parts[1]
 		}
+		sDef := h.states[s]
 		if sDef.action != nil {
 			return errors.New("action already exists")
 		}
-		s += ":" + event
+		s = childState(s, eventName)
+		eventNames = append(eventNames, eventName)
+		eventFields = append(eventFields, eventField)
 	}
 	sDef, ok := h.states[s]
 	if ok && len(sDef.transitions) > 0 {
@@ -230,23 +257,32 @@ func (h *EventHandler) RegisterAction(seq string, action ActionMaker) error {
 	}
 	// All is well
 	s = ""
-	for _, event := range events {
+	log.Printf("Action for %s: %v", seq, eventNames)
+	for _, eventName := range eventNames {
 		sDef := h.states[s]
 		if sDef.transitions == nil {
 			sDef.transitions = map[string]string{}
 			h.states[s] = sDef
 		}
-		s += ":" + event
-		sDef.transitions[event] = s
+		s = childState(s, eventName)
+		sDef.transitions[eventName] = s
 	}
 	sDef = h.states[s]
 	sDef.action = action
+	sDef.eventFields = eventFields
 	h.states[s] = sDef
 	return nil
 }
 
 // Reset the handler so any ongoing sequence is aborted.
 func (h *EventHandler) Reset() {
+	if h == nil {
+		return
+	}
 	h.currentState = ""
 	h.events = nil
+}
+
+func childState(s, t string) string {
+	return s + " " + t
 }

@@ -12,7 +12,12 @@ type Window struct {
 	topLine, leftCol int // Index of the topmost visible line, column of the leftmost visibile column
 	tabSize          int
 	width, height    int
+	eventHandler     *EventHandler
 }
+
+//
+// Movement methods
+//
 
 // MoveCursor moves the cursor by a number of lines and columns.
 func (w *Window) MoveCursor(dl, dc int) {
@@ -85,6 +90,10 @@ func (w *Window) ScrollUp(n int) {
 	}
 }
 
+//
+// Editing methods
+//
+
 // InsertRune inserts a character into the buffer at the cursor position.
 func (w *Window) InsertRune(r rune) {
 	err := w.buffer.InsertRune(r, w.l, w.c)
@@ -122,6 +131,19 @@ func (w *Window) SplitLine(move bool) {
 		w.l++
 	}
 }
+
+//
+// Buffer inspection methods
+//
+
+// CurrentLine returns the line the cursor is on currently.
+func (w *Window) CurrentLine() (Line, error) {
+	return w.buffer.GetLine(w.l, w.c)
+}
+
+//
+// Drawing methods
+//
 
 // Resize changes the size of the window.
 func (w *Window) Resize(width, height int) {
