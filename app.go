@@ -173,18 +173,13 @@ func (a *App) Init() {
 	}
 }
 
-func (a *App) LuaActionMaker(f runtime.Value) ActionMaker {
+func (a *App) LuaActionMaker(f func(...interface{})) ActionMaker {
 	return func(args []interface{}) Action {
-		luaArgs := make([]runtime.Value, len(args)+1)
-		for i, arg := range args {
-			luaArgs[i+1] = golib.NewGoValue(a.lua, arg)
-		}
+		luaArgs := make([]interface{}, len(args)+1)
+		copy(luaArgs[1:], args)
 		return func(win *Window) {
-			luaArgs[0] = golib.NewGoValue(a.lua, win)
-			_, err := runtime.Call1(a.lua.MainThread(), f, luaArgs...)
-			if err != nil {
-				a.Logf("Lua error: ", err)
-			}
+			luaArgs[0] = win
+			f(luaArgs...)
 		}
 	}
 }
@@ -194,8 +189,8 @@ type LuaBinding struct {
 	Action func(...interface{})
 }
 
-func (a *App) BindEvents(seq string, f runtime.Value) {
-	err := a.eventHandler.RegisterAction(seq, a.LuaActionMaker(f))
+func (a *App) BindEvents(b *LuaBinding) {
+	err := a.eventHandler.RegisterAction(b.Seq, a.LuaActionMaker(b.Action))
 	if err != nil {
 		a.Logf("Error binding events: %s", err)
 	}
