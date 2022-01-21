@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/arnodel/golua/lib"
+	"github.com/arnodel/golua/lib/debuglib"
 	"github.com/arnodel/golua/lib/golib"
 	"github.com/arnodel/golua/runtime"
 )
@@ -74,8 +75,10 @@ func NewApp(filename string) *App {
 	}
 
 	app.lua = runtime.New(app)
-	lib.Load(app.lua)
-
+	lib.LoadAll(app.lua)
+	app.lua.PushContext(runtime.RuntimeContextDef{
+		MessageHandler: debuglib.Traceback,
+	})
 	return app
 }
 
@@ -156,12 +159,12 @@ func (a *App) Init() {
 		a.Logf("Cannot read init file: %s", err)
 		return
 	}
-	chunk, err := runtime.CompileAndLoadLuaChunk("test", initFile, a.lua.GlobalEnv())
+	chunk, err := a.lua.CompileAndLoadLuaChunk("test", initFile, runtime.TableValue(a.lua.GlobalEnv()))
 	if err != nil {
 		a.Logf("Error compiling init file: %s", err)
 		return
 	}
-	initFunc, err2 := runtime.Call1(a.lua.MainThread(), chunk)
+	initFunc, err2 := runtime.Call1(a.lua.MainThread(), runtime.FunctionValue(chunk))
 	if err2 != nil {
 		a.Logf("Error running init chunk: %s", err2)
 		return
@@ -183,7 +186,7 @@ func (a *App) LuaActionMaker(f runtime.Value) ActionMaker {
 			luaArgs[0] = golib.NewGoValue(a.lua, win)
 			_, err := runtime.Call1(a.lua.MainThread(), f, luaArgs...)
 			if err != nil {
-				a.Logf("Lua error: ", err)
+				a.Logf("Lua error: %s", err)
 			}
 		}
 	}
