@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-type IBuffer interface {
+type Buffer interface {
 	LineCount() int
 	GetLine(l, c int) (Line, error)
 	InsertRune(r rune, l, c int) error
@@ -22,15 +22,15 @@ type IBuffer interface {
 	Save() error
 }
 
-// A Buffer maintains the data for a file.
-type Buffer struct {
+// A FileBuffer maintains the data for a file.
+type FileBuffer struct {
 	lines    []Line
 	filename string
 	readOnly bool
 }
 
-func NewBufferFromFile(filename string) *Buffer {
-	buf := &Buffer{
+func NewBufferFromFile(filename string) *FileBuffer {
+	buf := &FileBuffer{
 		filename: filename,
 	}
 	file, err := os.Open(filename)
@@ -56,7 +56,7 @@ func NewBufferFromFile(filename string) *Buffer {
 	return buf
 }
 
-func (b *Buffer) Save() error {
+func (b *FileBuffer) Save() error {
 	if b.readOnly {
 		return errors.New("Cannot save a read only buffer")
 	}
@@ -81,11 +81,11 @@ func (b *Buffer) Save() error {
 	return nil
 }
 
-func (b *Buffer) LineCount() int {
+func (b *FileBuffer) LineCount() int {
 	return len(b.lines)
 }
 
-func (b *Buffer) GetLine(l, c int) (Line, error) {
+func (b *FileBuffer) GetLine(l, c int) (Line, error) {
 	if len(b.lines) <= l {
 		return nil, fmt.Errorf("have %d lines, wamt to get line %d", len(b.lines), l)
 	}
@@ -96,7 +96,7 @@ func (b *Buffer) GetLine(l, c int) (Line, error) {
 	return line, nil
 }
 
-func (b *Buffer) InsertRune(r rune, l, c int) error {
+func (b *FileBuffer) InsertRune(r rune, l, c int) error {
 	line, err := b.GetLine(l, c)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (b *Buffer) InsertRune(r rune, l, c int) error {
 	return nil
 }
 
-func (b *Buffer) InsertLine(l int, line Line) {
+func (b *FileBuffer) InsertLine(l int, line Line) {
 	if l < 0 || l > len(b.lines) {
 		return
 	}
@@ -126,11 +126,11 @@ func (b *Buffer) InsertLine(l int, line Line) {
 	}
 }
 
-func (b *Buffer) AppendLine(line Line) {
+func (b *FileBuffer) AppendLine(line Line) {
 	b.InsertLine(len(b.lines), line)
 }
 
-func (b *Buffer) DeleteLine(l int) {
+func (b *FileBuffer) DeleteLine(l int) {
 	if l < 0 || l >= len(b.lines) {
 		return
 	}
@@ -139,7 +139,7 @@ func (b *Buffer) DeleteLine(l int) {
 	return
 }
 
-func (b *Buffer) MergeLineWithPrevious(l int) {
+func (b *FileBuffer) MergeLineWithPrevious(l int) {
 	if l < 1 || l >= len(b.lines) {
 		return
 	}
@@ -149,7 +149,7 @@ func (b *Buffer) MergeLineWithPrevious(l int) {
 	return
 }
 
-func (b *Buffer) SplitLine(l, c int) error {
+func (b *FileBuffer) SplitLine(l, c int) error {
 	line, err := b.GetLine(l, c)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func (b *Buffer) SplitLine(l, c int) error {
 	return nil
 }
 
-func (b *Buffer) DeleteRuneAt(l, c int) error {
+func (b *FileBuffer) DeleteRuneAt(l, c int) error {
 	line, err := b.GetLine(l, c)
 	if err != nil {
 		return err
@@ -174,7 +174,7 @@ func (b *Buffer) DeleteRuneAt(l, c int) error {
 	return nil
 }
 
-func (b *Buffer) AdvancePos(l, c, dl, dc int) (int, int) {
+func (b *FileBuffer) AdvancePos(l, c, dl, dc int) (int, int) {
 	if l < 0 {
 		return 0, 0
 	}
@@ -209,7 +209,7 @@ func (b *Buffer) AdvancePos(l, c, dl, dc int) (int, int) {
 	return l, c
 }
 
-func (b *Buffer) NearestPos(l, c int) (int, int) {
+func (b *FileBuffer) NearestPos(l, c int) (int, int) {
 	if l < 0 {
 		l = 0
 	} else if l >= len(b.lines) {
@@ -224,6 +224,6 @@ func (b *Buffer) NearestPos(l, c int) (int, int) {
 	return l, c
 }
 
-func (b *Buffer) EndPos() (int, int) {
+func (b *FileBuffer) EndPos() (int, int) {
 	return len(b.lines) - 1, len(b.lines[len(b.lines)-1])
 }

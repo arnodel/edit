@@ -23,9 +23,9 @@ type App struct {
 }
 
 func NewApp(filename string) *App {
-	var buf *Buffer
+	var buf *FileBuffer
 	if filename == "" {
-		buf = &Buffer{
+		buf = &FileBuffer{
 			lines: []Line{nil},
 		}
 	} else {
@@ -37,7 +37,7 @@ func NewApp(filename string) *App {
 		tabSize: 4,
 	}
 
-	logBuf := &Buffer{
+	logBuf := &FileBuffer{
 		lines: []Line{nil},
 	}
 	logWin := &Window{
