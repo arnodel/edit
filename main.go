@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/gdamore/tcell"
+	"github.com/gdamore/tcell/v2"
 	// "github.com/sourcegraph/go-lsp"
 	// "github.com/sourcegraph/jsonrpc2"
 	// "golang.org/x/tools/internal/lsp/protocol"
@@ -59,7 +59,9 @@ func main() {
 		log.Print("cannot get tcellScreen: ", err)
 		return
 	}
-	tcellScreen.Init()
+	if err := tcellScreen.Init(); err != nil {
+		log.Fatal("cannot init tcellScreen: ", err)
+	}
 	defer tcellScreen.Fini()
 	tcellScreen.EnableMouse()
 

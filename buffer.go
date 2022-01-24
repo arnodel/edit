@@ -18,6 +18,8 @@ type IBuffer interface {
 	DeleteRuneAt(l, c int) error
 	AdvancePos(l, c, dl, dc int) (int, int)
 	EndPos() (int, int)
+	AppendLine(Line)
+	Save() error
 }
 
 // A Buffer maintains the data for a file.

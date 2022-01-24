@@ -1,6 +1,6 @@
 package main
 
-import "github.com/gdamore/tcell"
+import "github.com/gdamore/tcell/v2"
 
 type TcellEventConverter struct {
 	lastButtonMask tcell.ButtonMask

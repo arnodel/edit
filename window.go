@@ -7,7 +7,7 @@ import (
 // A Window is a view to a buffer.  It maintains a cursor position, and a
 // rectangle view into the buffer.
 type Window struct {
-	buffer           *Buffer
+	buffer           IBuffer
 	l, c             int // line and column of the cursor
 	topLine, leftCol int // Index of the topmost visible line, column of the leftmost visibile column
 	tabSize          int
