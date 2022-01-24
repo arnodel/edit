@@ -34,12 +34,11 @@ func NewBufferFromFile(filename string) *FileBuffer {
 		filename: filename,
 	}
 	file, err := os.Open(filename)
-	defer file.Close()
-
 	if err != nil {
 		buf.InsertLine(0, Line{})
 		return buf
 	}
+	defer file.Close()
 	reader := bufio.NewReader(file)
 	var lines []Line
 	for {
@@ -65,6 +64,9 @@ func (b *FileBuffer) Save() error {
 		return err
 	}
 	file, err := os.Create(b.filename)
+	if err != nil {
+		return err
+	}
 	defer file.Close()
 	writer := bufio.NewWriter(file)
 	for _, line := range b.lines {
@@ -136,7 +138,6 @@ func (b *FileBuffer) DeleteLine(l int) {
 	}
 	copy(b.lines[l:], b.lines[l+1:])
 	b.lines = b.lines[:len(b.lines)-1]
-	return
 }
 
 func (b *FileBuffer) MergeLineWithPrevious(l int) {
@@ -146,7 +147,6 @@ func (b *FileBuffer) MergeLineWithPrevious(l int) {
 	b.lines[l-1] = b.lines[l-1].MergeWith(b.lines[l])
 	copy(b.lines[l:], b.lines[l+1:])
 	b.lines = b.lines[:len(b.lines)-1]
-	return
 }
 
 func (b *FileBuffer) SplitLine(l, c int) error {

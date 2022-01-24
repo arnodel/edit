@@ -105,17 +105,17 @@ func (w *Window) InsertRune(r rune) {
 }
 
 // DeleteRune deletes the character to the left of the cursor position.
-func (w *Window) DeleteRune() error {
+func (w *Window) DeleteRune() (err error) {
 	l, c := w.buffer.AdvancePos(w.l, w.c, 0, -1)
 	if w.c > 0 {
 		w.c--
-		w.buffer.DeleteRuneAt(l, c)
+		err = w.buffer.DeleteRuneAt(l, c)
 	} else {
 		w.buffer.MergeLineWithPrevious(w.l)
 	}
 	w.c = c
 	w.l = l
-	return nil
+	return
 }
 
 // SplitLine splits the current line at the cursor position. If move is true,
