@@ -11,14 +11,14 @@ type Buffer interface {
 	LineCount() int
 	GetLine(l, c int) (Line, error)
 	InsertRune(r rune, l, c int) error
-	InsertLine(l int, line Line)
-	DeleteLine(l int)
+	InsertLine(l int, line Line) error
+	DeleteLine(l int) error
 	MergeLineWithPrevious(l int)
 	SplitLine(l, c int) error
 	DeleteRuneAt(l, c int) error
 	AdvancePos(l, c, dl, dc int) (int, int)
 	EndPos() (int, int)
-	AppendLine(Line)
+	AppendLine(Line) error
 	Save() error
 }
 
@@ -28,6 +28,8 @@ type FileBuffer struct {
 	filename string
 	readOnly bool
 }
+
+var _ Buffer = (*FileBuffer)(nil)
 
 func NewBufferFromFile(filename string) *FileBuffer {
 	buf := &FileBuffer{
@@ -89,7 +91,7 @@ func (b *FileBuffer) LineCount() int {
 
 func (b *FileBuffer) GetLine(l, c int) (Line, error) {
 	if len(b.lines) <= l {
-		return nil, fmt.Errorf("have %d lines, wamt to get line %d", len(b.lines), l)
+		return nil, fmt.Errorf("have %d lines, want to get line %d", len(b.lines), l)
 	}
 	line := b.lines[l]
 	if line.Len() < c {
@@ -107,9 +109,9 @@ func (b *FileBuffer) InsertRune(r rune, l, c int) error {
 	return nil
 }
 
-func (b *FileBuffer) InsertLine(l int, line Line) {
+func (b *FileBuffer) InsertLine(l int, line Line) error {
 	if l < 0 || l > len(b.lines) {
-		return
+		return fmt.Errorf("out of range")
 	}
 	switch {
 	case l == len(b.lines):
@@ -126,18 +128,20 @@ func (b *FileBuffer) InsertLine(l int, line Line) {
 		copy(newLines[l+1:], b.lines[l:])
 		b.lines = newLines
 	}
+	return nil
 }
 
-func (b *FileBuffer) AppendLine(line Line) {
-	b.InsertLine(len(b.lines), line)
+func (b *FileBuffer) AppendLine(line Line) error {
+	return b.InsertLine(len(b.lines), line)
 }
 
-func (b *FileBuffer) DeleteLine(l int) {
+func (b *FileBuffer) DeleteLine(l int) error {
 	if l < 0 || l >= len(b.lines) {
-		return
+		return fmt.Errorf("out of range")
 	}
 	copy(b.lines[l:], b.lines[l+1:])
 	b.lines = b.lines[:len(b.lines)-1]
+	return nil
 }
 
 func (b *FileBuffer) MergeLineWithPrevious(l int) {
@@ -189,7 +193,7 @@ func (b *FileBuffer) AdvancePos(l, c, dl, dc int) (int, int) {
 	if c < 0 {
 		return 0, 0
 	}
-	for l < len(b.lines) && c > len(b.lines[l]) {
+	for l < len(b.lines) && c > b.lines[l].Len() {
 		c -= b.lines[l].Len() + 1
 		l++
 	}
@@ -203,7 +207,7 @@ func (b *FileBuffer) AdvancePos(l, c, dl, dc int) (int, int) {
 	if l >= len(b.lines) {
 		return b.EndPos()
 	}
-	if c > len(b.lines[l]) {
+	if c > b.lines[l].Len() {
 		return l, len(b.lines[l])
 	}
 	return l, c
@@ -218,8 +222,8 @@ func (b *FileBuffer) NearestPos(l, c int) (int, int) {
 	line := b.lines[l]
 	if c < 0 {
 		c = 0
-	} else if c > len(line) {
-		c = len(line)
+	} else if c > line.Len() {
+		c = line.Len()
 	}
 	return l, c
 }
