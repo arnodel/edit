@@ -1,4 +1,4 @@
-package main
+package edit
 
 type ArgType interface {
 	FromString() interface{}

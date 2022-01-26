@@ -1,4 +1,4 @@
-package main
+package edit
 
 func CmdInsertRune(r rune) Action {
 	return func(w *Window) { w.InsertRune(r) }
@@ -21,12 +21,14 @@ func CmdScrollDown(w *Window) { w.ScrollDown(1) }
 func CmdScrollUp(w *Window)   { w.ScrollUp(1) }
 
 func CmdResize(w, h int) Action {
-	return func(win *Window) { win.Resize(w, h) }
+	return func(win *Window) { win.App().Resize(w, h) }
 }
 
 func CmdMoveCursorTo(pos Position) Action {
 	return func(w *Window) { w.MoveCursorTo(pos.X, pos.Y) }
 }
+
+func CmdQuit(w *Window) { w.App().Quit() }
 
 func CmdSaveBuffer(w *Window) { w.buffer.Save() }
 
@@ -124,5 +126,9 @@ var defaultBindings = []struct {
 	{
 		seq:    "Ctrl-X Ctrl-S",
 		action: SimpleActionMaker(CmdSaveBuffer),
+	},
+	{
+		seq:    "Ctrl-C",
+		action: SimpleActionMaker(CmdQuit),
 	},
 }

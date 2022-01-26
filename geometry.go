@@ -1,4 +1,4 @@
-package main
+package edit
 
 type Position struct {
 	X, Y int

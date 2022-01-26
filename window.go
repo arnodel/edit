@@ -1,4 +1,4 @@
-package main
+package edit
 
 import (
 	"log"
@@ -13,6 +13,27 @@ type Window struct {
 	tabSize          int
 	width, height    int
 	eventHandler     *EventHandler
+	app              *App
+}
+
+func NewWindow(buf Buffer) *Window {
+	return &Window{
+		buffer:  buf,
+		tabSize: 4,
+	}
+}
+
+//
+// General
+//
+
+func (w *Window) RegisterWithApp(app *App) {
+	w.eventHandler = app.GetEventHandler(w.buffer.Kind())
+	w.app = app
+}
+
+func (w *Window) App() *App {
+	return w.app
 }
 
 //
@@ -31,21 +52,25 @@ func (w *Window) MoveCursorTo(x, y int) {
 		l = w.buffer.LineCount() - 1
 	}
 	line, _ := w.buffer.GetLine(l, 0)
-	w.c = w.getPrinter().LineIndex(line, x)
-	w.l = l
+	w.l, w.c = w.buffer.AdvancePos(l, w.getPrinter().LineIndex(line, x), 0, 0)
 }
 
 // MoveCursorToLineStart moves the cursor to the start of the current line.
 func (w *Window) MoveCursorToLineStart() {
-	w.c = 0
+	w.l, w.c = w.buffer.AdvancePos(w.l, 0, 0, 0)
 }
 
 // MoveCursorToLineEnd moves the cursor to the end of the current line.
 func (w *Window) MoveCursorToLineEnd() {
 	line, err := w.buffer.GetLine(w.l, w.c)
 	if err == nil {
-		w.c = line.Len()
+		w.l, w.c = w.buffer.AdvancePos(w.l, line.Len(), 0, 0)
 	}
+}
+
+func (w *Window) MoveCursorToEnd() {
+	l, c := w.buffer.EndPos()
+	w.l, w.c = w.buffer.AdvancePos(l, c, 0, 0)
 }
 
 // PageDown moves the cursor down by n pages (or up by -n pages if n < 0).
@@ -107,11 +132,10 @@ func (w *Window) InsertRune(r rune) {
 // DeleteRune deletes the character to the left of the cursor position.
 func (w *Window) DeleteRune() (err error) {
 	l, c := w.buffer.AdvancePos(w.l, w.c, 0, -1)
-	if w.c > 0 {
-		w.c--
+	if l == w.l {
 		err = w.buffer.DeleteRuneAt(l, c)
 	} else {
-		w.buffer.MergeLineWithPrevious(w.l)
+		err = w.buffer.MergeLineWithPrevious(w.l)
 	}
 	w.c = c
 	w.l = l
@@ -120,16 +144,16 @@ func (w *Window) DeleteRune() (err error) {
 
 // SplitLine splits the current line at the cursor position. If move is true,
 // the cursor is moved down otherwise it stays in the same position.
-func (w *Window) SplitLine(move bool) {
+func (w *Window) SplitLine(move bool) error {
 	err := w.buffer.SplitLine(w.l, w.c)
 	if err != nil {
 		log.Printf("error splitting line: %s", err)
-		return
+		return err
 	}
 	if move {
-		w.c = 0
-		w.l++
+		w.l, w.c = w.buffer.AdvancePos(w.l+1, 0, 0, 0)
 	}
+	return nil
 }
 
 //
@@ -139,6 +163,14 @@ func (w *Window) SplitLine(move bool) {
 // CurrentLine returns the line the cursor is on currently.
 func (w *Window) CurrentLine() (Line, error) {
 	return w.buffer.GetLine(w.l, w.c)
+}
+
+func (w *Window) Buffer() Buffer {
+	return w.buffer
+}
+
+func (w *Window) CursorLine() int {
+	return w.l
 }
 
 //
@@ -163,8 +195,7 @@ func (w *Window) Draw(screen ScreenWriter) {
 	}
 	lp := w.getPrinter()
 	for p := (Position{}); p.Y < sh; p.Y++ {
-		line, _ := w.buffer.GetLine(p.Y+w.topLine, 0)
-		lp.Print(screen, p, line)
+		lp.Print(screen, p, w.StyledLineIter(p.Y+w.topLine, 0))
 	}
 }
 
@@ -172,7 +203,7 @@ func (w *Window) Draw(screen ScreenWriter) {
 func (w *Window) DrawCursor(screen ScreenWriter) {
 	line, _ := w.buffer.GetLine(w.l, w.c)
 	screen.Reverse(Position{
-		X: w.getPrinter().LineCol(line[:w.c]),
+		X: w.getPrinter().LineCol(line, w.c),
 		Y: w.l - w.topLine,
 	})
 }
@@ -182,7 +213,7 @@ func (w *Window) DrawCursor(screen ScreenWriter) {
 func (w *Window) FocusCursor(screen ScreenWriter) {
 	sz := screen.Size()
 	line, _ := w.buffer.GetLine(w.l, w.c)
-	x := w.getPrinter().LineCol(line[:w.c])
+	x := w.getPrinter().LineCol(line, w.c)
 	if x < 0 {
 		w.leftCol += x
 	} else if x >= sz.W {
@@ -201,4 +232,8 @@ func (w *Window) getPrinter() Printer {
 		TabWidth: w.tabSize,
 		Offset:   w.leftCol,
 	}
+}
+
+func (w *Window) StyledLineIter(l, c int) StyledLineIter {
+	return w.buffer.StyledLineIter(l, c)
 }

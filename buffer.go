@@ -1,4 +1,4 @@
-package main
+package edit
 
 import (
 	"bufio"
@@ -13,13 +13,15 @@ type Buffer interface {
 	InsertRune(r rune, l, c int) error
 	InsertLine(l int, line Line) error
 	DeleteLine(l int) error
-	MergeLineWithPrevious(l int)
+	MergeLineWithPrevious(l int) error
 	SplitLine(l, c int) error
 	DeleteRuneAt(l, c int) error
 	AdvancePos(l, c, dl, dc int) (int, int)
 	EndPos() (int, int)
-	AppendLine(Line) error
+	AppendLine(Line)
 	Save() error
+	StyledLineIter(l, c int) StyledLineIter
+	Kind() string
 }
 
 // A FileBuffer maintains the data for a file.
@@ -30,6 +32,12 @@ type FileBuffer struct {
 }
 
 var _ Buffer = (*FileBuffer)(nil)
+
+func NewEmptyFileBuffer() *FileBuffer {
+	return &FileBuffer{
+		lines: []Line{NewLineFromString("", nil)},
+	}
+}
 
 func NewBufferFromFile(filename string) *FileBuffer {
 	buf := &FileBuffer{
@@ -48,7 +56,7 @@ func NewBufferFromFile(filename string) *FileBuffer {
 		if err != nil {
 			break
 		}
-		lines = append(lines, NewLineFromString(line[:len(line)-1]))
+		lines = append(lines, NewLineFromString(line[:len(line)-1], nil))
 	}
 	buf.lines = lines
 	if len(lines) == 0 {
@@ -89,15 +97,27 @@ func (b *FileBuffer) LineCount() int {
 	return len(b.lines)
 }
 
+func (b *FileBuffer) Line(l int) Line {
+	return b.lines[l]
+}
+
 func (b *FileBuffer) GetLine(l, c int) (Line, error) {
-	if len(b.lines) <= l {
-		return nil, fmt.Errorf("have %d lines, want to get line %d", len(b.lines), l)
+	if l < 0 || len(b.lines) <= l {
+		return Line{}, fmt.Errorf("out of range")
 	}
 	line := b.lines[l]
 	if line.Len() < c {
-		return nil, errors.New("line too short")
+		return Line{}, errors.New("line too short")
 	}
 	return line, nil
+}
+
+func (b *FileBuffer) SetLine(l int, line Line) error {
+	if l < 0 || len(b.lines) <= l {
+		return fmt.Errorf("out of range")
+	}
+	b.lines[l] = line
+	return nil
 }
 
 func (b *FileBuffer) InsertRune(r rune, l, c int) error {
@@ -131,8 +151,8 @@ func (b *FileBuffer) InsertLine(l int, line Line) error {
 	return nil
 }
 
-func (b *FileBuffer) AppendLine(line Line) error {
-	return b.InsertLine(len(b.lines), line)
+func (b *FileBuffer) AppendLine(line Line) {
+	b.lines = append(b.lines, line)
 }
 
 func (b *FileBuffer) DeleteLine(l int) error {
@@ -144,13 +164,18 @@ func (b *FileBuffer) DeleteLine(l int) error {
 	return nil
 }
 
-func (b *FileBuffer) MergeLineWithPrevious(l int) {
+func (b *FileBuffer) Truncate(count int) {
+	b.lines = b.lines[:count]
+}
+
+func (b *FileBuffer) MergeLineWithPrevious(l int) error {
 	if l < 1 || l >= len(b.lines) {
-		return
+		return fmt.Errorf("out of range")
 	}
 	b.lines[l-1] = b.lines[l-1].MergeWith(b.lines[l])
 	copy(b.lines[l:], b.lines[l+1:])
 	b.lines = b.lines[:len(b.lines)-1]
+	return nil
 }
 
 func (b *FileBuffer) SplitLine(l, c int) error {
@@ -208,7 +233,7 @@ func (b *FileBuffer) AdvancePos(l, c, dl, dc int) (int, int) {
 		return b.EndPos()
 	}
 	if c > b.lines[l].Len() {
-		return l, len(b.lines[l])
+		return l, b.lines[l].Len()
 	}
 	return l, c
 }
@@ -229,5 +254,13 @@ func (b *FileBuffer) NearestPos(l, c int) (int, int) {
 }
 
 func (b *FileBuffer) EndPos() (int, int) {
-	return len(b.lines) - 1, len(b.lines[len(b.lines)-1])
+	return len(b.lines) - 1, b.lines[len(b.lines)-1].Len()
+}
+
+func (b *FileBuffer) StyledLineIter(l, c int) StyledLineIter {
+	return NewConstStyleLineIter(b.lines[l].Iter(c), DefaultStyle)
+}
+
+func (v *FileBuffer) Kind() string {
+	return "plain"
 }

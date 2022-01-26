@@ -1,38 +1,65 @@
-package main
+package edit
 
 import "github.com/gdamore/tcell/v2"
 
 type ScreenWriter interface {
 	Size() Size
-	SetRune(Position, rune)
+	SetRune(Position, rune, tcell.Style)
 	Reverse(Position)
 	SubScreen(Rectangle) ScreenWriter
 }
 
 type Screen struct {
-	tcellScreen tcell.Screen
+	tcellScreen    tcell.Screen
+	eventConverter TcellEventConverter
 }
 
-func (s Screen) Fill(c rune) {
+func NewScreen() (*Screen, error) {
+	tcellScreen, err := tcell.NewScreen()
+	if err != nil {
+		return nil, err
+	}
+	err = tcellScreen.Init()
+	if err != nil {
+		return nil, err
+	}
+	tcellScreen.EnableMouse()
+	tcellScreen.EnablePaste()
+	return &Screen{tcellScreen: tcellScreen}, nil
+}
+
+func (s *Screen) Cleanup() {
+	s.tcellScreen.Fini()
+}
+
+func (s *Screen) PollEvent() Event {
+	return s.eventConverter.EventFromTcell(s.tcellScreen.PollEvent())
+}
+
+func (s *Screen) Fill(c rune) {
 	s.tcellScreen.Fill(' ', tcell.StyleDefault)
 }
 
-func (s Screen) Size() Size {
+func (s *Screen) Show() {
+	s.tcellScreen.Show()
+}
+
+func (s *Screen) Size() Size {
 	w, h := s.tcellScreen.Size()
 	return Size{W: w, H: h}
 }
 
-func (s Screen) SetRune(p Position, c rune) {
-	s.tcellScreen.SetContent(p.X, p.Y, c, nil, tcell.StyleDefault)
+func (s *Screen) SetRune(p Position, c rune, style tcell.Style) {
+	s.tcellScreen.SetContent(p.X, p.Y, c, nil, style)
 }
 
-func (s Screen) Reverse(p Position) {
+func (s *Screen) Reverse(p Position) {
 	mainc, combc, style, _ := s.tcellScreen.GetContent(p.X, p.Y)
 	s.tcellScreen.SetContent(p.X, p.Y, mainc, combc, style.Reverse(true))
 
 }
 
-func (s Screen) SubScreen(rect Rectangle) ScreenWriter {
+func (s *Screen) SubScreen(rect Rectangle) ScreenWriter {
 	return &SubScreen{
 		rect:   rect,
 		screen: s,
@@ -41,16 +68,16 @@ func (s Screen) SubScreen(rect Rectangle) ScreenWriter {
 
 type SubScreen struct {
 	rect   Rectangle
-	screen Screen
+	screen *Screen
 }
 
 func (s SubScreen) Size() Size {
 	return s.rect.Size
 }
 
-func (s SubScreen) SetRune(p Position, c rune) {
+func (s SubScreen) SetRune(p Position, c rune, style tcell.Style) {
 	if s.rect.Size.Contains(p) {
-		s.screen.SetRune(p.MoveBy(s.rect.Position), c)
+		s.screen.SetRune(p.MoveBy(s.rect.Position), c, style)
 	}
 }
 
@@ -74,17 +101,18 @@ type Printer struct {
 }
 
 // Print the line to the screen starting at coordinates (p.X, p.Y)
-func (lp Printer) Print(s ScreenWriter, p Position, l Line) {
+func (lp Printer) Print(s ScreenWriter, p Position, iter StyledLineIter) {
 	sz := s.Size()
 	if p.Y < 0 || p.Y >= sz.H {
 		return
 	}
 	col := -lp.Offset
-	for _, c := range l {
+	for iter.HasNext() {
+		r, style := iter.Next()
 		if col >= 0 {
-			s.SetRune(p.MoveByX(col), c)
+			s.SetRune(p.MoveByX(col), r, style)
 		}
-		if c == '\t' {
+		if r == '\t' {
 			col += lp.TabWidth
 		} else {
 			col++
@@ -96,10 +124,10 @@ func (lp Printer) Print(s ScreenWriter, p Position, l Line) {
 
 }
 
-func (p Printer) LineCol(l Line) int {
+func (p Printer) LineCol(l Line, i int) int {
 	col := -p.Offset
-	for _, c := range l {
-		if c == '\t' {
+	for iter := l.Iter(0); iter.HasNext() && i > 0; i-- {
+		if iter.Next() == '\t' {
 			col += p.TabWidth
 		} else {
 			col++
@@ -110,8 +138,8 @@ func (p Printer) LineCol(l Line) int {
 
 func (p Printer) LineIndex(l Line, targetCol int) int {
 	col := -p.Offset
-	for i, c := range l {
-		if c == '\t' {
+	for i, iter := 0, l.Iter(0); iter.HasNext(); i++ {
+		if iter.Next() == '\t' {
 			col += p.TabWidth
 		} else {
 			col++
