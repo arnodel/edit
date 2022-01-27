@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"errors"
 	"log"
 )
 
@@ -131,6 +132,9 @@ func (w *Window) InsertRune(r rune) {
 
 // DeleteRune deletes the character to the left of the cursor position.
 func (w *Window) DeleteRune() (err error) {
+	if w.l == 0 && w.c == 0 {
+		return errors.New("start of buffer")
+	}
 	l, c := w.buffer.AdvancePos(w.l, w.c, 0, -1)
 	if l == w.l {
 		err = w.buffer.DeleteRuneAt(l, c)
