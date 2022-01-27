@@ -79,7 +79,11 @@ var defaultBindings = []struct {
 		action: SimpleActionMaker(CmdCursorDown),
 	},
 	{
-		seq:    "Backspace2", // TODO
+		seq:    "Backspace",
+		action: SimpleActionMaker(CmdDeletePrevRune),
+	},
+	{
+		seq:    "Backspace2", // On MacOS
 		action: SimpleActionMaker(CmdDeletePrevRune),
 	},
 	{
