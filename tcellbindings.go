@@ -1,6 +1,8 @@
 package edit
 
-import "github.com/gdamore/tcell/v2"
+import (
+	"github.com/gdamore/tcell/v2"
+)
 
 type TcellEventConverter struct {
 	lastButtonMask tcell.ButtonMask
@@ -20,6 +22,8 @@ func (c *TcellEventConverter) EventFromTcell(tcevt tcell.Event) Event {
 	case *tcell.EventMouse:
 		buttonMask := tevt.Buttons()
 		mx, my := tevt.Position()
+		lastButtonMask := c.lastButtonMask
+		c.lastButtonMask = buttonMask
 		return Event{
 			EventType: Mouse,
 			MouseData: MouseData{
@@ -28,8 +32,8 @@ func (c *TcellEventConverter) EventFromTcell(tcevt tcell.Event) Event {
 					Y: my,
 				},
 				Buttons:         buttonsFromTcell(buttonMask),
-				ButtonsPressed:  buttonsFromTcell(buttonMask &^ c.lastButtonMask),
-				ButtonsReleased: buttonsFromTcell(c.lastButtonMask &^ buttonMask),
+				ButtonsPressed:  buttonsFromTcell(buttonMask &^ lastButtonMask),
+				ButtonsReleased: buttonsFromTcell(lastButtonMask &^ buttonMask),
 			},
 			Modifiers: modifiersFromTcell(tevt.Modifiers()),
 		}
