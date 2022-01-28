@@ -1,14 +1,21 @@
 package edit
 
 import (
+	"log"
+
 	"github.com/gdamore/tcell/v2"
 )
 
 type TcellEventConverter struct {
 	lastButtonMask tcell.ButtonMask
+	pasting        bool
+	pasteBuffer    []rune
 }
 
+const wheelButtons = tcell.WheelDown | tcell.WheelUp | tcell.WheelLeft | tcell.WheelRight
+
 func (c *TcellEventConverter) EventFromTcell(tcevt tcell.Event) Event {
+	log.Printf("tcell %#v", tcevt)
 	switch tevt := tcevt.(type) {
 	case *tcell.EventResize:
 		w, h := tevt.Size()
@@ -23,7 +30,7 @@ func (c *TcellEventConverter) EventFromTcell(tcevt tcell.Event) Event {
 		buttonMask := tevt.Buttons()
 		mx, my := tevt.Position()
 		lastButtonMask := c.lastButtonMask
-		c.lastButtonMask = buttonMask
+		c.lastButtonMask = buttonMask & ^wheelButtons
 		return Event{
 			EventType: Mouse,
 			MouseData: MouseData{
@@ -38,6 +45,10 @@ func (c *TcellEventConverter) EventFromTcell(tcevt tcell.Event) Event {
 			Modifiers: modifiersFromTcell(tevt.Modifiers()),
 		}
 	case *tcell.EventKey:
+		if c.pasting {
+			c.pasteBuffer = append(c.pasteBuffer, tevt.Rune())
+			return Event{}
+		}
 		if tevt.Key() == tcell.KeyRune {
 			return Event{
 				EventType: Rune,
@@ -50,6 +61,20 @@ func (c *TcellEventConverter) EventFromTcell(tcevt tcell.Event) Event {
 			Rune:      tevt.Rune(),
 			KeyData:   KeyData(tevt.Key()),
 			Modifiers: modifiersFromTcell(tevt.Modifiers()),
+		}
+	case *tcell.EventPaste:
+		if tevt.Start() {
+			c.pasting = true
+			c.pasteBuffer = c.pasteBuffer[:0]
+			return Event{}
+		} else {
+			c.pasting = false
+			buf := string(c.pasteBuffer)
+			c.pasteBuffer = c.pasteBuffer[:0]
+			return Event{
+				EventType:   Paste,
+				PasteString: buf,
+			}
 		}
 	default:
 		return Event{}

@@ -110,6 +110,32 @@ func (l Line) InsertRune(r rune, c int) Line {
 	}
 }
 
+// s must not contain a '\n'
+func (l Line) InsertString(s string, c int) Line {
+	runes := l.Runes
+	toInsert := []rune(s)
+	rsz := len(runes)
+	isz := len(toInsert)
+	switch {
+	case c < 0 || c > rsz:
+		return l
+	case c == rsz:
+		return Line{Runes: append(runes, toInsert...), Meta: l.Meta}
+	case cap(runes) >= rsz+isz:
+		tail := runes[c:]
+		runes = runes[:rsz+isz]
+		copy(runes[c+isz:], tail)
+		copy(runes[c:c+isz], toInsert)
+		return Line{Runes: runes, Meta: l.Meta}
+	default:
+		newRunes := make([]rune, rsz+isz, rsz+isz+10)
+		copy(newRunes[:c], runes[:c])
+		copy(newRunes[c:c+isz], toInsert)
+		copy(newRunes[c+isz:], runes[c:])
+		return Line{Runes: newRunes, Meta: l.Meta}
+	}
+}
+
 func (l Line) DeleteAt(c int) Line {
 	runes := l.Runes
 	switch {

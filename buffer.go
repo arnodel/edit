@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
+	"unicode/utf8"
 )
 
 type Buffer interface {
 	LineCount() int
 	GetLine(l, c int) (Line, error)
 	InsertRune(r rune, l, c int) error
+	InsertString(s string, l, c int) (int, int, error)
 	InsertLine(l int, line Line) error
 	DeleteLine(l int) error
 	MergeLineWithPrevious(l int) error
@@ -22,6 +26,7 @@ type Buffer interface {
 	Save() error
 	StyledLineIter(l, c int) StyledLineIter
 	Kind() string
+	StringFromRegion(l0, c0, l1, c1 int) (string, error)
 }
 
 // A FileBuffer maintains the data for a file.
@@ -127,6 +132,20 @@ func (b *FileBuffer) InsertRune(r rune, l, c int) error {
 	}
 	b.lines[l] = line.InsertRune(r, c)
 	return nil
+}
+
+func (b *FileBuffer) InsertString(s string, l, c int) (int, int, error) {
+	for i, part := range splitString(s) {
+		if i > 0 {
+			if err := b.SplitLine(l, c); err != nil {
+				return l, c, err
+			}
+			l, c = b.AdvancePos(l+1, 0, 0, 0)
+		}
+		b.lines[l] = b.lines[l].InsertString(part, c)
+		l, c = b.AdvancePos(l, c, 0, utf8.RuneCountInString(part))
+	}
+	return l, c, nil
 }
 
 func (b *FileBuffer) InsertLine(l int, line Line) error {
@@ -261,6 +280,38 @@ func (b *FileBuffer) StyledLineIter(l, c int) StyledLineIter {
 	return NewConstStyleLineIter(b.lines[l].Iter(c), DefaultStyle)
 }
 
-func (v *FileBuffer) Kind() string {
+func (b *FileBuffer) Kind() string {
 	return "plain"
 }
+
+func (b *FileBuffer) StringFromRegion(l0, c0, l1, c1 int) (string, error) {
+	if l1 < l0 || (l0 == l1 && c1 < c0) {
+		l0, c0, l1, c1 = l1, c1, l0, c0
+	}
+	var builder strings.Builder
+	for l := l0; l <= l1; l++ {
+		line, err := b.GetLine(l, -1)
+		runes := line.Runes
+		if err != nil {
+			return "", err
+		}
+		if l == l1 && c1 < len(runes) {
+			runes = runes[:c1+1]
+		}
+		if l == l0 {
+			runes = runes[c0:]
+		} else {
+			builder.WriteByte('\n')
+		}
+		for _, r := range runes {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String(), nil
+}
+
+func splitString(s string) []string {
+	return newLines.Split(s, -1)
+}
+
+var newLines = regexp.MustCompile(`(?s)\r\n|\n\r|\r`)

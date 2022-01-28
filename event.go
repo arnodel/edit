@@ -16,6 +16,7 @@ const (
 	Key
 	Mouse
 	Resize
+	Paste
 )
 
 func (t EventType) Name() string {
@@ -28,6 +29,8 @@ func (t EventType) Name() string {
 		return "Mouse"
 	case Resize:
 		return "Resize"
+	case Paste:
+		return "Paste"
 	default:
 		return ""
 	}
@@ -99,6 +102,7 @@ type Event struct {
 	Modifiers
 	MouseData
 	Size
+	PasteString string
 }
 
 func (e Event) nameWithoutMod() string {
@@ -117,7 +121,14 @@ func (e Event) nameWithoutMod() string {
 		if !e.ButtonsReleased.Empty() {
 			return "MouseRelease-" + e.ButtonsReleased.Name()
 		}
+		if !e.Buttons.Empty() {
+			return "MouseDrag-" + e.Buttons.Name()
+		}
 		return "MouseMove"
+	case Resize:
+		return "Resize"
+	case Paste:
+		return "Paste"
 	default:
 		return ""
 	}
@@ -179,7 +190,8 @@ func convertEvents(events []Event, fields []string) []interface{} {
 			out = append(out, evt.Position)
 		case "Size":
 			out = append(out, evt.Size)
-
+		case "PasteString":
+			out = append(out, evt.PasteString)
 		}
 	}
 	return out
@@ -271,6 +283,33 @@ func (h *EventHandler) RegisterAction(seq string, action ActionMaker) error {
 	sDef.action = action
 	sDef.eventFields = eventFields
 	h.states[s] = sDef
+	return nil
+}
+
+func (h *EventHandler) UnregisterAction(seq string) error {
+	if h == nil {
+		return nil
+	}
+	events := strings.Split(seq, " ")
+	var eventNames []string
+	for _, event := range events {
+		parts := strings.SplitN(event, ".", 2)
+		eventName := parts[0]
+		eventNames = append(eventNames, eventName)
+	}
+	s := ""
+	log.Printf("Action for %s: %v", seq, eventNames)
+	for _, eventName := range eventNames {
+		sDef := h.states[s]
+		if sDef.transitions != nil {
+			delete(sDef.transitions, eventName)
+			if len(sDef.transitions) == 0 {
+				delete(h.states, s)
+			}
+		}
+		s = childState(s, eventName)
+	}
+	delete(h.states, s)
 	return nil
 }
 

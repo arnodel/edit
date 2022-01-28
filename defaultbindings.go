@@ -24,13 +24,44 @@ func CmdResize(w, h int) Action {
 	return func(win *Window) { win.App().Resize(w, h) }
 }
 
-func CmdMoveCursorTo(pos Position) Action {
-	return func(w *Window) { w.MoveCursorTo(pos.X, pos.Y) }
+func CmdMoveButtonDown(pos Position) Action {
+	return func(w *Window) {
+		w.StartHighlightRegion(pos.X, pos.Y)
+	}
+}
+
+func CmdMouseDrag(pos Position) Action {
+	return func(w *Window) {
+		w.MoveHighlightRegion(pos.X, pos.Y)
+	}
+}
+
+func CmdMouseButtonUp(pos Position) Action {
+	return func(w *Window) {
+		if !w.StopHightlightRegion(pos.X, pos.Y) {
+			w.MoveCursorTo(pos.X, pos.Y)
+		} else {
+			s, err := w.GetHighlightedString()
+			if err != nil {
+				return
+			}
+			err = w.App().CopyToClipboard(s)
+			if err != nil {
+				return
+			}
+		}
+	}
 }
 
 func CmdQuit(w *Window) { w.App().Quit() }
 
 func CmdSaveBuffer(w *Window) { w.buffer.Save() }
+
+func CmdPasteString(s string) Action {
+	return func(w *Window) {
+		w.PasteString(s)
+	}
+}
 
 func SimpleActionMaker(f Action) ActionMaker {
 	return func(args []interface{}) Action { return f }
@@ -116,7 +147,19 @@ var defaultBindings = []struct {
 	{
 		seq: "MousePress-Button1.Position",
 		action: func(args []interface{}) Action {
-			return CmdMoveCursorTo(args[0].(Position))
+			return CmdMoveButtonDown(args[0].(Position))
+		},
+	},
+	{
+		seq: "MouseRelease-Button1.Position",
+		action: func(args []interface{}) Action {
+			return CmdMouseButtonUp(args[0].(Position))
+		},
+	},
+	{
+		seq: "MouseDrag-Button1.Position",
+		action: func(args []interface{}) Action {
+			return CmdMouseDrag(args[0].(Position))
 		},
 	},
 	{
@@ -134,5 +177,11 @@ var defaultBindings = []struct {
 	{
 		seq:    "Ctrl-C",
 		action: SimpleActionMaker(CmdQuit),
+	},
+	{
+		seq: "Paste.PasteString",
+		action: func(args []interface{}) Action {
+			return CmdPasteString(args[0].(string))
+		},
 	},
 }

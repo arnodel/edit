@@ -9,6 +9,7 @@ import (
 	"github.com/arnodel/golua/lib/debuglib"
 	"github.com/arnodel/golua/lib/golib"
 	"github.com/arnodel/golua/runtime"
+	"github.com/atotto/clipboard"
 )
 
 type App struct {
@@ -112,7 +113,7 @@ func (a *App) Resize(w, h int) {
 }
 
 func (a *App) HandleEvent(evt Event) {
-	action, err := a.focusedWindow.eventHandler.HandleEvent(evt)
+	action, err := a.focusedWindow.HandleEvent(evt)
 	if action == nil {
 		action, err = a.eventHandler.HandleEvent(evt)
 	}
@@ -181,6 +182,10 @@ func (a *App) Running() bool {
 	return a.running
 }
 
+func (a *App) CopyToClipboard(s string) error {
+	return clipboard.WriteAll(s)
+}
+
 func (a *App) LuaActionMaker(f runtime.Value) ActionMaker {
 	return func(args []interface{}) Action {
 		luaArgs := make([]runtime.Value, len(args)+1)
@@ -197,12 +202,18 @@ func (a *App) LuaActionMaker(f runtime.Value) ActionMaker {
 	}
 }
 
-func (a *App) BindEvents(name, seq string, f runtime.Value) {
+func (a *App) BindEvents(name, seq string, f runtime.Value) error {
 	h := a.GetEventHandler(name)
 	err := h.RegisterAction(seq, a.LuaActionMaker(f))
 	if err != nil {
 		a.Logf("Error binding events: %s", err)
 	}
+	return err
+}
+
+func (a *App) UnbindEvents(name, seq string) error {
+	h := a.GetEventHandler(name)
+	return h.UnregisterAction(seq)
 }
 
 func (a *App) GetEventHandler(name string) *EventHandler {
