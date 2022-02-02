@@ -235,6 +235,10 @@ func (w *Window) CursorLine() int {
 	return w.l
 }
 
+func (w *Window) CursorPos() (int, int) {
+	return w.l, w.c
+}
+
 //
 // Drawing methods
 //
